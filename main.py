@@ -7,7 +7,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ==========================================
-# 1. 네이버 뉴스 검색 및 수집 (인사/노무 타겟 최적화)
+# 1. 네이버 뉴스 검색 및 수집
 # ==========================================
 def get_hr_news():
     keywords = ["인사노무", "노사교섭", "임단협", "고용노동부 지침", "노동법 개정"]
@@ -17,7 +17,7 @@ def get_hr_news():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
 
-    print("확장된 인사/노무 핵심 키워드로 네이버 최신 뉴스를 수집합니다...")
+    print("인사/노무 핵심 키워드로 네이버 최신 뉴스를 수집합니다...")
 
     for keyword in keywords:
         url = f"https://search.naver.com/search.naver?where=news&query={keyword}&sm=tab_smr&sort=1"
@@ -53,7 +53,7 @@ def get_hr_news():
     return news_list
 
 # ==========================================
-# 2. Gemini AI를 활용한 뉴스브리핑 생성 (호환성 최적화 패치)
+# 2. Gemini AI를 활용한 뉴스브리핑 생성 (404 완벽 우회 패치)
 # ==========================================
 def generate_newsletter_with_gemini(news_list):
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -62,15 +62,15 @@ def generate_newsletter_with_gemini(news_list):
         
     genai.configure(api_key=api_key)
     
-    # [호환성 패치] 구형/신형 환경 모두에서 가장 안정적으로 작동하는 레거시-최신 호환 모델 코드를 사용합니다.
-    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+    # [최종 패치] 앞뒤의 불필요한 경로(models/) 인식을 강제로 끊고 범용 규격인 'gemini-1.5-flash'를 직접 명시합니다.
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
     raw_news_text = ""
     for idx, news in enumerate(news_list, 1):
         raw_news_text += f"[{idx}] 키워드: {news['keyword']}\n제목: {news['title']}\n요약원문: {news['summary']}\n링크: {news['url']}\n\n"
     
     prompt = f"""
-    당신은 대한민국 최고의 기업 인사노무 전문가이자 Chief HR Officer (CHO) 전담 비서입니다.
+    당신은 대한민국 최고의 기업 인사노무 전문가이자 CHO 전담 비서입니다.
     아래 수집된 최신 뉴스 데이터들을 바탕으로, 오늘 아침 기업 경영진과 인사팀이 반드시 읽고 선제 대응해야 할 '일일 HR 뉴스레터'를 작성해 주세요.
 
     [수집된 뉴스 데이터]
@@ -80,7 +80,7 @@ def generate_newsletter_with_gemini(news_list):
     1. 제목은 세련되고 전문적인 인사 브리핑 형태로 작성해 주세요 (예: "[세방 HR 브리핑] 오늘의 주요 인사·노무 동향")
     2. 뉴스들을 단순 나열하지 말고 중요도나 주제별로 2~3개의 그룹으로 묶어서 정리해 주세요.
     3. 각 뉴스 요약 끝에는 인사담당자가 주목해야 할 '실무적 시사점 또는 대응 팁'을 1~2줄씩 덧붙여 주세요.
-    4. 중요: 메일 본문에서 글자가 깨지지 않도록 마크다운 기호(예: **, #, -)는 절대 사용하지 마세요. 대신 일반 줄바꿈과 이모지(📌, 🚀)만을 사용하여 읽기 편하게 서식을 구성해 주세요.
+    4. 메일 본문에서 글자가 깨지지 않도록 마크다운 기호(예: **, #, -)는 절대 사용하지 마세요. 대신 일반 줄바꿈과 이모지(📌, 🚀)만을 사용하여 읽기 편하게 서식을 구성해 주세요.
     """
     
     print("Gemini AI가 맞춤형 HR 뉴스레터를 요약 및 생성 중입니다...")
@@ -103,7 +103,6 @@ def send_email(content):
     msg['To'] = receiver_email
     msg['Subject'] = f"[세방 HR 뉴스레터] 오늘의 주요 인사·노무 동향"
     
-    # 순수 텍스트 포맷으로 호환성 극대화 발송
     msg.attach(MIMEText(content, 'plain', 'utf-8'))
     
     print("구글 SMTP 서버에 접속하여 메일을 발송합니다...")
