@@ -2,9 +2,8 @@ name: Daily HR Newsletter Automation
 
 on:
 schedule:
-# 한국 시간(KST) 오전 8시는 UTC 기준 전날 오후 11시입니다.
 - cron: '0 23 * * *'
-workflow_dispatch: # 직접 실행 버튼 활성화
+workflow_dispatch:
 
 jobs:
 run-newsletter:
