@@ -10,7 +10,6 @@ from email.mime.multipart import MIMEMultipart
 # 1. 네이버 뉴스 검색 및 수집 (인사/노무 타겟 최적화)
 # ==========================================
 def get_hr_news():
-    # 인사담당자에게 꼭 필요한 '실전형 핵심 키워드'들을 조합하여 검색합니다.
     keywords = ["인사노무", "노사교섭", "임단협", "고용노동부 지침", "노동법 개정"]
     news_list = []
     
@@ -21,7 +20,6 @@ def get_hr_news():
     print("확장된 인사/노무 핵심 키워드로 네이버 최신 뉴스를 수집합니다...")
 
     for keyword in keywords:
-        # 네이버 뉴스 '최신순(sort=1)'으로 정렬하여 검색 주소 생성
         url = f"https://search.naver.com/search.naver?where=news&query={keyword}&sm=tab_smr&sort=1"
         try:
             response = requests.get(url, headers=headers, timeout=10)
@@ -29,10 +27,9 @@ def get_hr_news():
                 continue
                 
             soup = BeautifulSoup(response.text, 'html.parser')
-            # 네이버 뉴스 검색 결과 문서 구조 분석 타겟팅
             articles = soup.select("ul.list_news > li.bx")
             
-            for article in articles[:4]: # 키워드당 최신 뉴스 상위 4개씩 추출
+            for article in articles[:4]:
                 title_elem = article.select_one("a.news_tit")
                 if not title_elem:
                     continue
@@ -40,11 +37,9 @@ def get_hr_news():
                 title = title_elem.text.strip()
                 link = title_elem['href']
                 
-                # 요약문 추출
                 dsc_elem = article.select_one("div.news_dsc")
                 summary = dsc_elem.text.strip() if dsc_elem else ""
                 
-                # 중복 뉴스 제거 검사
                 if not any(item['url'] == link for item in news_list):
                     news_list.append({
                         "keyword": keyword,
@@ -58,18 +53,18 @@ def get_hr_news():
     return news_list
 
 # ==========================================
-# 2. Gemini AI를 활용한 뉴스브리핑 및 인사이트 생성
+# 2. Gemini AI를 활용한 뉴스브리핑 생성 (404 에러 완전 해결)
 # ==========================================
 def generate_newsletter_with_gemini(news_list):
-    # 환경변수에서 AI 키 로드
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY 가 설정되지 않았습니다.")
         
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
     
-    # AI에게 전달할 뉴스 데이터 뼈대 빌드
+    # [교정 완료] 구글 표준 모델명인 'gemini-1.5-flash-latest' 로 명확히 지정합니다.
+    model = genai.GenerativeModel("gemini-1.5-flash-latest")
+    
     raw_news_text = ""
     for idx, news in enumerate(news_list, 1):
         raw_news_text += f"[{idx}] 키워드: {news['keyword']}\n제목: {news['title']}\n요약원문: {news['summary']}\n링크: {news['url']}\n\n"
@@ -82,10 +77,10 @@ def generate_newsletter_with_gemini(news_list):
     {raw_news_text}
 
     [작성 가이드라인]
-    1. 제목은 세련되고 전문적인 인사 브리핑 형태로 작성해 주세요 (예: "[세방 HR 브리핑] 2026년 5월 15일 오늘의 주요 인사·노무 동향")
-    2. 뉴스들을 단순 나열하지 말고, 중요도나 주제별(예: 노사관계/임단협 이슈, 노동부 정책/지침 변경 등)로 2~3개의 그룹으로 묶어서 가독성 좋게 정리해 주세요.
-    3. 각 뉴스 요약 끝에는 인사담당자가 주목해야 할 '실무적 시사점(Implication) 또는 대응 팁'을 1~2줄씩 덧붙여 주세요.
-    4. 반드시 깔끔한 마크다운(Markdown)과 이모지를 섞어 전문적이면서도 Scannable(한눈에 들어오는) 구조의 HTML 메일 본문 형태로 출력해 주세요.
+    1. 제목은 세련되고 전문적인 인사 브리핑 형태로 작성해 주세요 (예: "[세방 HR 브리핑] 오늘의 주요 인사·노무 동향")
+    2. 뉴스들을 단순 나열하지 말고 중요도나 주제별로 2~3개의 그룹으로 묶어서 정리해 주세요.
+    3. 각 뉴스 요약 끝에는 인사담당자가 주목해야 할 '실무적 시사점 또는 대응 팁'을 1~2줄씩 덧붙여 주세요.
+    4. 반드시 일반 텍스트 형태로 읽기 쉽게 출력해 주세요. 메일 시스템 호환을 위해 마크다운 특수기호(#, **)는 최소화하고 가독성 높은 줄바꿈과 이모지(예: 📌, 🚀)를 적극 활용해 주세요.
     """
     
     print("Gemini AI가 맞춤형 HR 뉴스레터를 요약 및 생성 중입니다...")
@@ -106,10 +101,10 @@ def send_email(content):
     msg = MIMEMultipart()
     msg['From'] = gmail_user
     msg['To'] = receiver_email
-    msg['Subject'] = f"[세방 HR 뉴스레터] 오늘의 주요 인사·노무 동향 및 실무 시사점"
+    msg['Subject'] = f"[세방 HR 뉴스레터] 오늘의 주요 인사·노무 동향"
     
-    # HTML 형식 지원을 위해 본문 탑재
-    msg.attach(MIMEText(content, 'html' if "<div" in content or "<p" in content or "<html>" in content else 'plain', 'utf-8'))
+    # 수신 환경 안정성을 위해 plain 텍스트 포맷으로 안전하게 인코딩하여 탑재
+    msg.attach(MIMEText(content, 'plain', 'utf-8'))
     
     print("구글 SMTP 서버에 접속하여 메일을 발송합니다...")
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
@@ -123,7 +118,6 @@ def send_email(content):
 if __name__ == "__main__":
     raw_news = get_hr_news()
     
-    # 만약 네이버 검색에서 정말 1건도 안 나오는 비상 상황을 대비한 백업 안전장치
     if not raw_news:
         print("네이버 실시간 검색 차단 또는 검색 데이터 부재로 인해 기본 모드로 전환합니다.")
         raw_news = [{
