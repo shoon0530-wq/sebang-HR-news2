@@ -30,7 +30,7 @@ def get_hr_news():
     ]
     news_list = []
     
-    # [핵심 교정] 기업명뿐만 아니라 주요 대형 이슈 키워드까지 카운팅하는 통합 딕셔너리
+    # 기업명뿐만 아니라 주요 대형 이슈 키워드까지 카운팅하는 통합 딕셔너리
     issue_counts = {}
     
     print("📰 기업 및 시사 이슈별 중복 제거(최대 2개 제한) 필터링 시작...")
@@ -132,7 +132,8 @@ def generate_newsletter_with_gemini(news_list):
     {raw_news_text}
     """
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # 🔍 [수정 완료] 기존 135번째 줄 부근의 v1beta 주소를 최신 규격인 v1 정식 주소로 수정했습니다.
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     
     try:
@@ -140,6 +141,8 @@ def generate_newsletter_with_gemini(news_list):
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
+            # 주소 요청 실패 시 어떤 에러코드(상태코드)인지 로그를 상세히 찍어주도록 강화
+            print(f"❌ 구글 AI 주소 호출 에러: {response.status_code} - {response.text}")
             return None
     except Exception as e:
         print(f"AI 호출 오류: {e}")
@@ -242,13 +245,33 @@ def send_email(html_content):
         print(f"메일 발송 오류: {e}")
 
 if __name__ == "__main__":
-    raw_news = get_hr_news()
-    
-    if not raw_news:
-        raw_news = [
-            {"keyword": "시사이슈", "title": "주요 대기업 하반기 임단협 주요 쟁점 조율 및 정부 지침 전달", "source": "노동일보", "url": "https://news.google.com"}
-        ]
+    try:
+        raw_news = get_hr_news()
         
-    ai_content = generate_newsletter_with_gemini(raw_news)
-    final_html = build_html_template(ai_content, raw_news)
-    send_email(final_html)
+        # [안정화 보완] 수집된 뉴스가 0개일 때도 작동 여부를 알 수 있는 알림 메일 발송 구조화
+        if not raw_news:
+            print("⚠️ 최근 3일 이내의 새로운 대형 시사 이슈 기사가 검색되지 않았습니다.")
+            today_str = datetime.now().strftime('%Y년 %m월 %d일')
+            no_news_html = f"""
+            <div style="background-color: #f8fafc; padding: 40px 20px; font-family: 'Malgun Gothic', sans-serif; text-align: center;">
+                <div style="max-width: 620px; margin: 0 auto; background: #ffffff; padding: 35px 30px; border-radius: 12px; border-top: 5px solid #64748b; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                    <h2 style="color: #1e293b; margin-top: 0; font-size: 20px;">세방 HR 브리핑 시스템 알림</h2>
+                    <p style="font-size: 15px; color: #475569; line-height: 1.6; margin-bottom: 20px;">
+                        안녕하세요. 오늘({today_str}) 지정된 핵심 시사 키워드(<span style="color: #2563eb; font-weight: bold;">노란봉투법, 삼성전자 노사, 법안 개정 등</span>)에 대해<br>
+                        <strong>최근 3일 이내에 새로 발행된 주요 기사가 발견되지 않았습니다.</strong>
+                    </p>
+                    <p style="font-size: 13px; color: #94a3b8; margin-bottom: 0; background: #f1f5f9; padding: 10px; border-radius: 6px;">
+                        ※ 주말 직후이거나 해당 키워드 관련 실시간 속보가 없을 때 발생할 수 있는 정상적인 현상입니다.
+                    </p>
+                </div>
+            </div>
+            """
+            send_email(no_news_html)
+        else:
+            # 기사가 성공적으로 수집되었을 때의 기존 정상 프로세스
+            ai_content = generate_newsletter_with_gemini(raw_news)
+            final_html = build_html_template(ai_content, raw_news)
+            send_email(final_html)
+            
+    except Exception as main_error:
+        print(f"❌ 시스템 치명적 오류 발생: {main_error}")
