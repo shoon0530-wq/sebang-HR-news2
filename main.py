@@ -136,18 +136,18 @@ def generate_newsletter_with_gemini(news_list):
 def build_html_template(ai_content, raw_news):
     today_str = datetime.now().strftime('%Y년 %m월 %d일')
     
-    # [디자인 개편] 전체 바탕 배경을 은은하고 고급스러운 미색(#f8fafc)으로 깔고 여백 조정
+    # 상단 여백을 없애기 위해 전체 padding의 위쪽(top)을 0으로 조정하고 마진을 초기화합니다.
     html_body = f"""
-    <div style="background-color: #f8fafc; padding: 40px 10px; font-family: 'Malgun Gothic', sans-serif; color: #334155; line-height: 1.6;">
-        <div style="max-width: 620px; margin: 0 auto;">
+    <div style="background-color: #f8fafc; padding: 0px 10px 40px 10px; font-family: 'Malgun Gothic', sans-serif; color: #334155; line-height: 1.6; margin: 0;">
+        <div style="max-width: 620px; margin: 0 auto; padding-top: 10px;">
             
-            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 35px 25px; text-align: center; border-radius: 12px 12px 0 0; color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                <span style="background: rgba(255,255,255,0.15); padding: 4px 14px; border-radius: 20px; font-size: 11px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase;">HR Trend Report</span>
-                <h1 style="margin: 12px 0 6px 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px;">세방 HR 브리핑</h1>
-                <p style="margin: 0; font-size: 14px; opacity: 0.8; font-weight: 300;">{today_str} 오늘의 인사·노무 최신 뉴스레터</p>
+            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 25px 20px; text-align: center; border-radius: 12px 12px 0 0; color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin: 0;">
+                <span style="display: inline-block; background: rgba(255,255,255,0.15); padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px;">HR Trend Report</span>
+                <h1 style="margin: 4px 0 4px 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; color: #ffffff;">세방 HR 브리핑</h1>
+                <p style="margin: 0; font-size: 13px; opacity: 0.8; font-weight: 300; color: #ffffff;">{today_str} 오늘의 인사·노무 최신 뉴스레터</p>
             </div>
             
-            <div style="background-color: #ffffff; padding: 15px 20px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b; text-align: center; border-radius: 0;">
+            <div style="background-color: #ffffff; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b; text-align: center; margin: 0;">
                 🔔 특정 기업의 도배를 제외하고, 최근 <strong>3일 내 엄선된 종합 노동 뉴스</strong>를 전달합니다.
             </div>
             
