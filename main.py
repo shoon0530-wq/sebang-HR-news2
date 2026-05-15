@@ -52,7 +52,7 @@ def get_hr_news():
     return news_list
 
 # ==========================================
-# 2. 라이브러리 버그를 우회하는 API 직접 호출 방식 (REST API)
+# 2. REST API 모델 경로 중복 완벽 교정 패치
 # ==========================================
 def generate_newsletter_with_gemini(news_list):
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -77,7 +77,7 @@ def generate_newsletter_with_gemini(news_list):
     4. 메일 본문에서 글자가 깨지지 않도록 마크다운 기호(예: **, #)는 절대 사용하지 마세요. 일반 줄바꿈과 이모지만 사용하여 가독성을 높여주세요.
     """
     
-    # 구글 라이브러리를 쓰지 않고, 가장 확실하고 주소가 고정된 구글 공식 REST API 포트를 직접 때립니다.
+    # [핵심 교정] v1 통로 뒤에 모델 명칭만 순수하게 배치하여 중복 경로(models/models/) 에러를 원천 봉쇄합니다.
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     payload = {
@@ -90,14 +90,14 @@ def generate_newsletter_with_gemini(news_list):
         ]
     }
     
-    print("라이브러리 우회형 포트를 통해 Gemini 뉴스레터를 직접 안전하게 생성 중입니다...")
+    print("교정된 다이렉트 주소로 구글 AI 서버에 뉴스레터 생성을 요청합니다...")
     response = requests.post(url, headers=headers, json=payload, timeout=30)
     
     if response.status_code == 200:
         result_json = response.json()
         try:
             return result_json['candidates'][0]['content']['parts'][0]['text']
-        except (KeyError, IndexErrors) as e:
+        except (KeyError, IndexError) as e:
             raise RuntimeError(f"구글 응답 파싱 실패: {result_json}")
     else:
         raise RuntimeError(f"구글 AI 서버 호출 실패 (에러코드 {response.status_code}): {response.text}")
