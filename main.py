@@ -5,9 +5,6 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# ==========================================
-# 1. 네이버 뉴스 검색 및 수집
-# ==========================================
 def get_hr_news():
     keywords = ["인사노무", "노사교섭", "임단협", "고용노동부 지침", "노동법 개정"]
     news_list = []
@@ -16,7 +13,7 @@ def get_hr_news():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
 
-    print("인사/노무 핵심 키워드로 네이버 최신 뉴스를 수집합니다...")
+    print("네이버 최신 뉴스를 수집합니다...")
 
     for keyword in keywords:
         url = f"https://search.naver.com/search.naver?where=news&query={keyword}&sm=tab_smr&sort=1"
@@ -47,13 +44,10 @@ def get_hr_news():
                         "summary": summary
                     })
         except Exception as e:
-            print(f"[{keyword}] 검색 중 사소한 오류 발생 (패스): {e}")
+            print(f"[{keyword}] 검색 중 오류 발생 (패스): {e}")
             
     return news_list
 
-# ==========================================
-# 2. REST API 모델 경로 중복 완벽 교정 패치
-# ==========================================
 def generate_newsletter_with_gemini(news_list):
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -77,8 +71,8 @@ def generate_newsletter_with_gemini(news_list):
     4. 메일 본문에서 글자가 깨지지 않도록 마크다운 기호(예: **, #)는 절대 사용하지 마세요. 일반 줄바꿈과 이모지만 사용하여 가독성을 높여주세요.
     """
     
-    # [핵심 교정] v1 통로 뒤에 모델 명칭만 순수하게 배치하여 중복 경로(models/models/) 에러를 원천 봉쇄합니다.
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # 구글 공식 최신 REST API 주소 규격에 맞춰 엔드포인트를 정확하게 변경했습니다.
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     payload = {
         "contents": [
@@ -90,7 +84,7 @@ def generate_newsletter_with_gemini(news_list):
         ]
     }
     
-    print("교정된 다이렉트 주소로 구글 AI 서버에 뉴스레터 생성을 요청합니다...")
+    print("구글 API 서버에 뉴스레터 생성을 요청합니다...")
     response = requests.post(url, headers=headers, json=payload, timeout=30)
     
     if response.status_code == 200:
@@ -102,9 +96,6 @@ def generate_newsletter_with_gemini(news_list):
     else:
         raise RuntimeError(f"구글 AI 서버 호출 실패 (에러코드 {response.status_code}): {response.text}")
 
-# ==========================================
-# 3. 구글 SMTP 서버를 통한 뉴스레터 메일 발송
-# ==========================================
 def send_email(content):
     gmail_user = os.environ.get("GMAIL_USER")
     gmail_pw = os.environ.get("GMAIL_APP_PW")
@@ -124,17 +115,17 @@ def send_email(content):
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
         server.login(gmail_user, gmail_pw)
         server.sendmail(gmail_user, receiver_email, msg.as_string())
-    print("뉴스레터 메일 발송 완벽하게 성공!")
+    print("뉴스레터 메일 발송 성공!")
 
 if __name__ == "__main__":
     raw_news = get_hr_news()
     
     if not raw_news:
-        print("네이버 실시간 검색 차단 또는 검색 데이터 부재로 인해 기본 모드로 전환합니다.")
+        print("기본 뉴스 모드로 전환합니다.")
         raw_news = [{
             "keyword": "인사노무 기본동향",
             "title": "주요 대기업 노사 교섭 및 상반기 임단협 집중 모니터링 필요성",
-            "summary": "최근 대기업들을 중심으로 임금 인상률 조율 및 노사 성과급 배분 갈등이 심화되고 있어, 인사팀의 실시간 동향 모니터링과 선제적 리스크 관리가 요구됩니다.",
+            "summary": "최근 대기업들을 중심으로 임금 인상률 조율 및 노사 성과급 배분 갈등이 심화되고 있어 리스크 관리가 요구됩니다.",
             "url": "https://news.naver.com"
         }]
         
