@@ -1,17 +1,17 @@
-name: 일일 HR 뉴스레터 자동화
+name: 일일 F&B 뉴스레터 자동화
 
 on:
   schedule:
-    # 23:00 UTC = 한국 시간(KST) 다음날 오전 08:00
-    # 월~금 아침에 실행되도록 일~목 밤 23시로 설정 (0=일, 1=월, 2=화, 3=수, 4=목)
-    - cron: '0 23 * * 0-4'
-  workflow_dispatch: # 수동 실행 버튼도 유지합니다.
+    # 🌟 한국시간(KST) 매일 아침 08:00 정각에 발송 설정
+    # (UTC 23:00은 한국 시간으로 다음날 오전 08:00입니다)
+    - cron: '0 23 * * *'
+  workflow_dispatch: # 수동 실행 버튼 활성화
 
 jobs:
   run-newsletter:
     runs-on: ubuntu-latest
     steps:
-      - name: 코드 체크아웃
+      - name: 저장소 코드 체크아웃
         uses: actions/checkout@v4
 
       - name: 파이썬 환경 설정
@@ -20,12 +20,13 @@ jobs:
           python-version: '3.10'
 
       - name: 필수 라이브러리 설치
-        run: pip install requests beautifulsoup4 feedparser
+        run: |
+          pip install feedparser requests
 
-      - name: 뉴스레터 스크립트 실행
+      - name: 뉴스레터 생성 및 발송 스크립트 실행
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PW: ${{ secrets.GMAIL_APP_PW }}
           RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python main.py
