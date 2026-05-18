@@ -20,7 +20,7 @@ except ImportError:
     import requests
 
 def get_hr_news():
-    # 🔍 10가지 인사노무 테마 완벽 세분화
+    # 🔍 10가지 인사노무 핵심 테마
     categories = [
         {"name": "노동법 개정", "query": "근로기준법 개정 시간단위 연차 4시간 근무 선택 퇴근"},
         {"name": "노란봉투법", "query": "노란봉투법 국회 본회의"},
@@ -37,13 +37,20 @@ def get_hr_news():
     news_list = []
     global_issue_counts = {"파업/노사": 0, "노란봉투": 0}
     
-    print("📰 [격리 카테고리 스캔] 테마별 균등 수집(방당 최대 2개) 시작...")
-    
     if hasattr(ssl, '_create_unverified_context'):
         ssl._create_default_https_context = ssl._create_unverified_context
         
     now = datetime.now()
-    three_days_ago = now - timedelta(days=3)
+    
+    # 📆 [날짜 보정 패치] 월요일이거나 연휴 직후(주말 공백)일 때는 수집 범위를 7일 전까지 확대하여 기사 고갈을 막습니다.
+    if now.weekday() in [0, 1]:  # 월요일(0) 또는 화요일(1)인 경우
+        days_ago = 7
+        print(f"📅 주말/연휴 공백을 감안하여 최근 {days_ago}일간의 뉴스를 검색합니다.")
+    else:
+        days_ago = 4  # 평일에는 4일 이내 신선한 뉴스 수집
+        print(f"📅 평일 주기: 최근 {days_ago}일간의 뉴스를 검색합니다.")
+        
+    time_limit = now - timedelta(days=days_ago)
         
     for cat in categories:
         cat_name = cat["name"]
@@ -53,30 +60,34 @@ def get_hr_news():
         url = f"https://news.google.com/rss/search?q={encoded_keyword}&hl=ko&gl=KR&ceid=KR:ko"
         
         cat_collected_count = 0
-        max_quota = 2
+        max_quota = 2  # 이슈 성격별 최대 2개 강제 제한 유지
         
         try:
             feed = feedparser.parse(url)
             for entry in feed.entries:
                 if cat_collected_count >= max_quota:
-                    break # 한 카테고리 방에 2개 차면 즉시 다음 방으로 이동
+                    break
                     
                 title = entry.title
                 link = entry.link
                 source = entry.source.title if hasattr(entry, 'source') else "언론사"
                 
+                # 발행 날짜 체크
                 is_recent = True
                 if hasattr(entry, 'published_parsed') and entry.published_parsed:
                     pub_dt = datetime.fromtimestamp(time.mktime(entry.published_parsed))
-                    if pub_dt < three_days_ago:
+                    if pub_dt < time_limit:
                         is_recent = False
                 
                 if not is_recent or not link:
                     continue
                     
+                # 제목 끝에 붙는 언론사 꼬리표 깨끗하게 제거
                 clean_title = title.split(" - ")[0].strip()
+                if " < " in clean_title:
+                    clean_title = clean_title.split(" < ")[0].strip()
                 
-                # 타 카테고리에 속보 쏠림을 막는 2중 안전 잠금장치
+                # 특정 이슈 과밀집 방지 2중 안전 잠금 장치
                 strike_words = ["파업", "쟁의", "노사 갈등", "임단협", "성과급", "삼성전자"]
                 yellow_words = ["노란봉투", "노란 봉투"]
                 
@@ -102,10 +113,10 @@ def get_hr_news():
                     if any(w in clean_title for w in yellow_words):
                         global_issue_counts["노란봉투"] += 1
                         
-                    print(f"   ✅ [{cat_name}] 매칭 성공: {clean_title[:25]}...")
+                    print(f"   ✅ [{cat_name}] 수집 ({cat_collected_count}/{max_quota}): {clean_title[:25]}...")
                     
         except Exception as e:
-            print(f"[{cat_name}] 검색 중 에러 스킵: {e}")
+            print(f"[{cat_name}] 검색 오류 스킵: {e}")
             
     print(f"📊 최종 균등 조율 완료 뉴스 총합: {len(news_list)}개")
     return news_list
@@ -122,12 +133,12 @@ def generate_newsletter_with_gemini(news_list):
     prompt = f"""
     당신은 대기업의 수석 인사노무 전문가이자 뉴스레터 편집자입니다.
     아래 제공되는 최신 뉴스 데이터를 바탕으로 경영진을 위한 종합 데일리 리포트를 작성해 주세요.
-    유연근무, AI 트렌드, 정년연장, 판례, 세무 등 다양한 테마들이 골고루 섞여 있으니 이 균형을 살려 작성해야 합니다.
+    다양한 테마들이 균형 있게 섞여 있으니 이 결을 그대로 유지해야 합니다.
     
     [핵심 작성 규칙]
     1. 답변은 반드시 아래의 포맷 양식으로만 구성해야 하며, 마크다운 기호(#, **, ` 등)는 절대로 쓰지 마세요.
-    2. 각 기사에 대해 명확한 요점을 정확히 2줄로 작성해 주세요.
-    3. 각 기사 본문 작성이 끝나면 다음 기사로 넘어가기 전에 [구분자] 코드를 반드시 적어주세요.
+    2. 각 기사에 대해 날카롭고 명확한 핵심 요점을 정확히 2줄(불릿포인트)로 작성해 주세요.
+    3. 각 기사 본문 작성이 끝나면 다음 기사로 넘어가기 전에 [구분자] 코드를 반드시 새 행에 적어주세요.
     
     [출력 양식 예시]
     언론사이름 | 기사제목
@@ -156,12 +167,11 @@ def generate_newsletter_with_gemini(news_list):
 def build_html_template(ai_content, raw_news):
     today_str = datetime.now().strftime('%Y년 %m월 %d일')
     
-    # 🔍 PC 가독성 패치: background-color: #0f172a 단색을 명시하여 PC 아웃룩 등에서 배경이 날아가는 현상을 완벽 차단합니다.
     html_body = f"""
     <div style="background-color: #f8fafc; padding: 20px 10px 40px 10px; font-family: 'Malgun Gothic', sans-serif; color: #334155; line-height: 1.6; margin: 0;">
         <div style="max-width: 620px; margin: 0 auto;">
             
-            <div style="background-color: #0f172a; background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 30px 20px; text-align: center; border-radius: 12px; color: #ffffff; margin-bottom: 20px;">
+            <div style="background-color: #0f172a; padding: 30px 20px; text-align: center; border-radius: 12px; color: #ffffff; margin-bottom: 20px;">
                 <span style="display: inline-block; background-color: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; letter-spacing: 1.5px; margin-bottom: 8px; color: #ffffff;">EXECUTIVE HR BRIEFING</span>
                 <h1 style="margin: 0px 0 6px 0; font-size: 26px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px;">세방 HR 브리핑</h1>
                 <p style="margin: 0; font-size: 13px; color: #ffffff; opacity: 0.85; font-weight: 300;">{today_str} 주요 인사·노무 및 시사 트렌드 동향</p>
@@ -171,8 +181,11 @@ def build_html_template(ai_content, raw_news):
     """
     
     try:
+        # AI 결과가 유효하고 구분자가 존재하는지 검증 후 파싱
         if ai_content and "[구분자]" in ai_content:
             articles = ai_content.strip().split("[구분자]")
+            valid_count = 0
+            
             for article in articles:
                 lines = [line.strip() for line in article.strip().split('\n') if line.strip()]
                 if len(lines) >= 3:
@@ -180,15 +193,24 @@ def build_html_template(ai_content, raw_news):
                     link_line = lines[-1]
                     summary_lines = lines[1:-1]
                     
-                    source_name = "종합이슈"
+                    if not link_line.startswith("http"):
+                        continue
+                        
+                    source_name = "주요이슈"
                     title_name = header_line
                     if "|" in header_line:
                         source_name, title_name = header_line.split("|", 1)
                     
                     summary_html = ""
                     for sl in summary_lines:
-                        summary_html += f"<li style='margin-bottom: 6px;'>{sl.replace('•', '').strip()}</li>"
+                        clean_sl = sl.replace('•', '').replace('-', '').strip()
+                        if clean_sl:
+                            summary_html += f"<li style='margin-bottom: 6px;'>{clean_sl}</li>"
                     
+                    if not summary_html:
+                        continue
+                        
+                    valid_count += 1
                     html_body += f"""
                     <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #2563eb; padding: 22px; margin-bottom: 20px; border-radius: 8px;">
                         <div style="margin-bottom: 10px;">
@@ -203,13 +225,18 @@ def build_html_template(ai_content, raw_news):
                         </div>
                     </div>
                     """
+            
+            if valid_count == 0:
+                raise Exception("No valid parsed articles")
         else:
             raise Exception("Fallback Trigger")
+            
     except Exception:
+        # 파싱 중 예외 발생 시 원본 데이터를 안전하게 매핑하여 빈 메일 발송 방지
         for news in raw_news:
             html_body += f"""
             <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid #64748b; padding: 22px; margin-bottom: 20px; border-radius: 8px;">
-                <span style="background-color: #f1f5f9; color: #475569; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 6px;">{news['source']}</span>
+                <span style="background-color: #f1f5f9; color: #475569; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 6px;">{news['source']} ({news['keyword']})</span>
                 <h3 style="margin: 8px 0 14px 0; font-size: 15px; color: #1e293b; font-weight: bold;">{news['title']}</h3>
                 <div style="text-align: right;">
                     <a href="{news['url']}" target="_blank" style="color: #2563eb; font-size: 13px; font-weight: bold; text-decoration: none;">기사 원문 보기 →</a>
@@ -271,7 +298,7 @@ if __name__ == "__main__":
                     <h2 style="color: #1e293b; margin-top: 0; font-size: 20px;">세방 HR 브리핑 시스템 알림</h2>
                     <p style="font-size: 15px; color: #475569; line-height: 1.6; margin-bottom: 20px;">
                         안녕하세요. 오늘({today_str}) 지정된 핵심 시사 키워드에 대해<br>
-                        <strong>최근 3일 이내에 새로 발행된 주요 기사가 발견되지 않았습니다.</strong>
+                        <strong>최근 발행된 주요 기사가 발견되지 않았습니다.</strong>
                     </p>
                 </div>
             </div>
