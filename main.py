@@ -39,7 +39,7 @@ def get_hr_news():
         
     now = datetime.now()
     # 신선도를 유지하면서도 주말 공백을 채울 수 있도록 5일치 데이터를 스캔합니다.
-    time_limit = now - timedelta(days=5)
+    time_limit = now - timedelta(days=7)
     
     print("📰 [자율형 트렌드 스캔] 단어 도배 검사 및 동적 카테고리 생성 시작...")
     
