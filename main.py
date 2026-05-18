@@ -20,18 +20,24 @@ except ImportError:
     import requests
 
 def get_hr_news():
-    keywords = [
-        "노란봉투법", 
-        "삼성전자 노사", 
-        "근로기준법 개정 국회", 
-        "대기업 임단협 파업", 
-        "고용노동부 장관 지침",
-        "인사노무 트렌드"
+    # 🔍 10가지 인사노무 테마 완벽 세분화
+    categories = [
+        {"name": "노동법 개정", "query": "근로기준법 개정 시간단위 연차 4시간 근무 선택 퇴근"},
+        {"name": "노란봉투법", "query": "노란봉투법 국회 본회의"},
+        {"name": "정년연장", "query": "고령자 정년연장 계속고용 정년 법제화"},
+        {"name": "인사 현안", "query": "주4.5일제 유연근무제 주4일제 도입 기업"},
+        {"name": "AI 인사 노무", "query": "HR 테크 AI 인사관리 노무 자동화 트렌드"},
+        {"name": "노무 파업 임단협", "query": "삼성전자 파업 대기업 임단협 성과급 협상"},
+        {"name": "정부 제도 변경", "query": "고용노동부 제도 변경 취업자 증가 고용 동향"},
+        {"name": "세무 및 사건사고", "query": "직장인 연말정산 종합소득세 횡령 사건사고"},
+        {"name": "인사노무 판례", "query": "대법원 인사노무 판례 통상임금 근로자성 선고"},
+        {"name": "인사 트렌드", "query": "인사담당자 채용 트렌드 조직문화 가치관"}
     ]
-    news_list = []
-    issue_counts = {}
     
-    print("📰 기업 및 시사 이슈별 중복 제거 필터링 시작...")
+    news_list = []
+    global_issue_counts = {"파업/노사": 0, "노란봉투": 0}
+    
+    print("📰 [격리 카테고리 스캔] 테마별 균등 수집(방당 최대 2개) 시작...")
     
     if hasattr(ssl, '_create_unverified_context'):
         ssl._create_default_https_context = ssl._create_unverified_context
@@ -39,13 +45,22 @@ def get_hr_news():
     now = datetime.now()
     three_days_ago = now - timedelta(days=3)
         
-    for keyword in keywords:
-        encoded_keyword = urllib.parse.quote(keyword)
+    for cat in categories:
+        cat_name = cat["name"]
+        query_str = cat["query"]
+        
+        encoded_keyword = urllib.parse.quote(query_str)
         url = f"https://news.google.com/rss/search?q={encoded_keyword}&hl=ko&gl=KR&ceid=KR:ko"
+        
+        cat_collected_count = 0
+        max_quota = 2
         
         try:
             feed = feedparser.parse(url)
             for entry in feed.entries:
+                if cat_collected_count >= max_quota:
+                    break # 한 카테고리 방에 2개 차면 즉시 다음 방으로 이동
+                    
                 title = entry.title
                 link = entry.link
                 source = entry.source.title if hasattr(entry, 'source') else "언론사"
@@ -60,35 +75,39 @@ def get_hr_news():
                     continue
                     
                 clean_title = title.split(" - ")[0].strip()
-                issue_key = clean_title[:4].replace(" ", "")
                 
-                macro_topics = [
-                    "노란봉투법", "노란봉투", "삼성전자", "삼성", "근로기준법", 
-                    "최저임금", "주52시간", "임단협", "파업", "노동부", "금호타이어", "KAI"
-                ]
-                for topic in macro_topics:
-                    if topic in clean_title:
-                        issue_key = topic
-                        break
+                # 타 카테고리에 속보 쏠림을 막는 2중 안전 잠금장치
+                strike_words = ["파업", "쟁의", "노사 갈등", "임단협", "성과급", "삼성전자"]
+                yellow_words = ["노란봉투", "노란 봉투"]
                 
-                if issue_counts.get(issue_key, 0) >= 2:
-                    continue
+                if any(w in clean_title for w in strike_words):
+                    if global_issue_counts["파업/노사"] >= 2 and cat_name != "노무 파업 임단협":
+                        continue
+                        
+                if any(w in clean_title for w in yellow_words):
+                    if global_issue_counts["노란봉투"] >= 2 and cat_name != "노란봉투법":
+                        continue
                 
                 if not any(n['url'] == link for n in news_list):
                     news_list.append({
-                        "keyword": keyword,
+                        "keyword": cat_name,
                         "title": clean_title,
                         "url": link,
                         "source": source
                     })
-                    issue_counts[issue_key] = issue_counts.get(issue_key, 0) + 1
                     
-                if len(news_list) >= 15:
-                    break
+                    cat_collected_count += 1
+                    if any(w in clean_title for w in strike_words):
+                        global_issue_counts["파업/노사"] += 1
+                    if any(w in clean_title for w in yellow_words):
+                        global_issue_counts["노란봉투"] += 1
+                        
+                    print(f"   ✅ [{cat_name}] 매칭 성공: {clean_title[:25]}...")
+                    
         except Exception as e:
-            print(f"[{keyword}] 뉴스 파싱 중 스킵: {e}")
+            print(f"[{cat_name}] 검색 중 에러 스킵: {e}")
             
-    print(f"📊 최종 필터링 뉴스 개수: {len(news_list)}개")
+    print(f"📊 최종 균등 조율 완료 뉴스 총합: {len(news_list)}개")
     return news_list
 
 def generate_newsletter_with_gemini(news_list):
@@ -98,16 +117,17 @@ def generate_newsletter_with_gemini(news_list):
         
     raw_news_text = ""
     for idx, news in enumerate(news_list, 1):
-        raw_news_text += f"[{idx}] 매체: {news['source']} | 토픽: {news['keyword']}\n제목: {news['title']}\n링크: {news['url']}\n\n"
+        raw_news_text += f"[{idx}] 분야: {news['keyword']} | 매체: {news['source']}\n제목: {news['title']}\n링크: {news['url']}\n\n"
     
     prompt = f"""
     당신은 대기업의 수석 인사노무 전문가이자 뉴스레터 편집자입니다.
-    아래 제공되는 {len(news_list)}개의 최신 뉴스 데이터를 바탕으로 경영진을 위한 데일리 리포트를 작성해 주세요.
+    아래 제공되는 최신 뉴스 데이터를 바탕으로 경영진을 위한 종합 데일리 리포트를 작성해 주세요.
+    유연근무, AI 트렌드, 정년연장, 판례, 세무 등 다양한 테마들이 골고루 섞여 있으니 이 균형을 살려 작성해야 합니다.
     
     [핵심 작성 규칙]
     1. 답변은 반드시 아래의 포맷 양식으로만 구성해야 하며, 마크다운 기호(#, **, ` 등)는 절대로 쓰지 마세요.
-    2. 각 기사에 대해 명확한 요점 요점을 정확히 2줄로 작성해 주세요.
-    3. 각 기사 본문 작성이 끝나면 [구분자] 코드를 반드시 적어주세요.
+    2. 각 기사에 대해 명확한 요점을 정확히 2줄로 작성해 주세요.
+    3. 각 기사 본문 작성이 끝나면 다음 기사로 넘어가기 전에 [구분자] 코드를 반드시 적어주세요.
     
     [출력 양식 예시]
     언론사이름 | 기사제목
@@ -128,7 +148,6 @@ def generate_newsletter_with_gemini(news_list):
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            print(f"❌ 구글 AI 호출 에러: {response.status_code}")
             return None
     except Exception as e:
         print(f"AI 호출 오류: {e}")
@@ -137,7 +156,7 @@ def generate_newsletter_with_gemini(news_list):
 def build_html_template(ai_content, raw_news):
     today_str = datetime.now().strftime('%Y년 %m월 %d일')
     
-    # 🔍 PC 화면 가독성 패치: background-color 단색(#0f172a)을 우선 배치하여 그라데이션 차단 환경에서도 글자가 보이도록 보완
+    # 🔍 PC 가독성 패치: background-color: #0f172a 단색을 명시하여 PC 아웃룩 등에서 배경이 날아가는 현상을 완벽 차단합니다.
     html_body = f"""
     <div style="background-color: #f8fafc; padding: 20px 10px 40px 10px; font-family: 'Malgun Gothic', sans-serif; color: #334155; line-height: 1.6; margin: 0;">
         <div style="max-width: 620px; margin: 0 auto;">
@@ -225,7 +244,6 @@ def send_email(html_content):
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(gmail_user, gmail_pw)
-            
             for receiver_email in receiver_list:
                 msg = MIMEMultipart()
                 msg['From'] = gmail_user
@@ -254,9 +272,6 @@ if __name__ == "__main__":
                     <p style="font-size: 15px; color: #475569; line-height: 1.6; margin-bottom: 20px;">
                         안녕하세요. 오늘({today_str}) 지정된 핵심 시사 키워드에 대해<br>
                         <strong>최근 3일 이내에 새로 발행된 주요 기사가 발견되지 않았습니다.</strong>
-                    </p>
-                    <p style="font-size: 13px; color: #94a3b8; margin-bottom: 0; background: #f1f5f9; padding: 10px; border-radius: 6px;">
-                        ※ 속보가 없거나 주말 직후일 때 발생할 수 있는 정상적인 현상입니다.
                     </p>
                 </div>
             </div>
