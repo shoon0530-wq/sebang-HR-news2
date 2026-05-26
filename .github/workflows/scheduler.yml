@@ -2,9 +2,10 @@ name: 일일 HR 뉴스레터 자동화
 
 on:
   schedule:
-    # 세계 표준시(UTC) 22:12 = 한국 시간(KST) 오전 07:12분
-    - cron: '12 22 * * *'
-  workflow_dispatch: # 수동 실행 버튼
+    # 🌟 평일(월,화,수,목,금)에만 작동하도록 요일 제한(1-5) 설정
+    # (외부 타이머 세팅이 번거로우실 경우를 대비한 최소한의 예약 안전장치입니다)
+    - cron: '45 22 * * 1-5'
+  workflow_dispatch: # 🚀 외부 타이머(cron-job.org)가 API로 즉시 원격 제어할 수 있는 문을 열어둡니다.
 
 jobs:
   run-newsletter:
