@@ -7,6 +7,9 @@ on:
     - cron: '45 22 * * 1-5'
   workflow_dispatch: # 🚀 외부 타이머(cron-job.org)가 API로 즉시 원격 제어할 수 있는 문을 열어둡니다.
 
+permissions:
+  contents: write
+
 jobs:
   run-newsletter:
     runs-on: ubuntu-latest
